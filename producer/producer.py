@@ -32,7 +32,7 @@ class DataProducer:
         while retry_count < max_retries:
             try: 
                 self.producer = KafkaProducer(
-                    bootstrap_servers = Config.KAFKA_BOOSTRAP_SERVERS,
+                    bootstrap_servers = Config.KAFKA_BOOTSTRAP_SERVERS,
                     value_serializer=lambda v: json.dumps(v).encode('utf-8'),
                     acks='all', 
                     retries=3
@@ -100,7 +100,7 @@ class DataProducer:
         """Generate a fake order with items"""
         customer = random.choice(self.customers)
         num_items = random.randint(1,5)
-        order_items  random.sample(self.products, num_items)
+        order_items = random.sample(self.products, num_items)
 
         order = {
             'order_id': fake.uuid4(),

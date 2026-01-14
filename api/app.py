@@ -170,7 +170,6 @@ def customer_segments():
 
         return jsonify(results)
     except Exception as e:
-        return jsonify as e:
         return jsonify({'error': str(e)}), 500
 
 @app.route('/api/order/recent')
@@ -196,7 +195,7 @@ def recent_orders():
             ORDER BY o.order_date DESC
             LIMIT %s
         """
-        cursor execute(query, (limit,))
+        cursor.execute(query, (limit,))
         results = cursor.fetchall()
 
         cursor.close()

@@ -10,15 +10,15 @@ services:
       POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
       POSTGRES_DB: ${POSTGRES_DB}
     ports:
-      - "5432:5432"
+      - "127.0.0.1:5433:5432"
     volumes:
       - postgres_data:/var/lib/postgresql/data
       - ./postgres/init.sql:/docker-entrypoint-initdb.d/01-init.sql
-      - ./postgres/schema.sql:docker-entrypoint-initdb.d/02-schema.sql
+      - ./postgres/schema.sql:/docker-entrypoint-initdb.d/02-schema.sql
     networks:
       - data-pipeline
     healthcheck:
-      test: ["CMD-SHELL", pg_isready -U ${POSTGRES_USER}]
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER}"]
       interval: 10s
       timeout: 5s
       retries: 5
@@ -28,40 +28,47 @@ services:
     image: confluentinc/cp-kafka:7.5.0
     container_name: kafka_broker
     ports:
-      - "9092:9092"
-      - "9093:9093"
+      - "127.0.0.1:9092:9092"
+      - "127.0.0.1:9093:9093"
     environment:
-      KAFKA_NODE_ID: 1
-      KAFKA_PROCESS_ROLES: broker, controller
-      KAFKA_LISTENERS: PLAINTEXT://0.0.0.0:9092, CONTROLLER://0.0.0.0:9093 #mở port để lắng nghe trên container kafka
-      KAFKA_ADVERTISED_LISTENERS: PLAINTEXT://kafka:9092 #quảng cáo port(nôm na là để cho container khác có thể resolve tới địa chỉ kafka bằng chính tên của kafka nhờ docker dns)
-      KAFKA_CONTROLLER_QUORUM_VOTERS: 1@kafka:9093 # khai báo voters để map cho các controller
-      KAFKA_OFFSETS_TOPIC_REPLICATION_FACTOR: 1 # số bản sao offset topic (danh sách đọc đến của consumer) trong cluster
-      KAFKA_TRANSACTION_STATE_LOG_REPLICATION_FACTOR: 1 # số bản sao transaction state (trạng thái giao dịch(nhiều message thành một transaction gửi hết hoặc không gửi gì hết)) trong cluster
-      KAFKA_TRANSACTION_STATE_LOG_MIN_ISR: 1 # số bản sao cần replicate trước khi có thể commit
-      KAFKA_GROUP_INITIAL_REBALANCE_DELAY_MS: 0 # thời gian chờ trước khi phân phối message cho các consumer - theo partition (nếu trường hợp khách hàng join và leave quá nhanh - phục vụ project thực tế(demo nên để 0))
-      KAFKA_LOG_DIRS: /tmp/kraft-combined-logs
+      # ID Cluster cố định (đừng đổi)
       CLUSTER_ID: 'MkU3OEVBNTcwNTJENDM2Qk'
+      KAFKA_NODE_ID: 1
+      KAFKA_PROCESS_ROLES: broker,controller
+      
+      # QUAN TRỌNG: Không được để khoảng trắng sau dấu phẩy trong các dòng dưới
+      KAFKA_LISTENERS: PLAINTEXT://0.0.0.0:9092,CONTROLLER://0.0.0.0:9093
+      KAFKA_ADVERTISED_LISTENERS: PLAINTEXT://kafka:9092
+      KAFKA_CONTROLLER_LISTENER_NAMES: CONTROLLER
+      KAFKA_LISTENER_SECURITY_PROTOCOL_MAP: CONTROLLER:PLAINTEXT,PLAINTEXT:PLAINTEXT
+      KAFKA_INTER_BROKER_LISTENER_NAME: PLAINTEXT
+      
+      KAFKA_CONTROLLER_QUORUM_VOTERS: 1@kafka:9093
+      KAFKA_OFFSETS_TOPIC_REPLICATION_FACTOR: 1
+      KAFKA_TRANSACTION_STATE_LOG_REPLICATION_FACTOR: 1
+      KAFKA_TRANSACTION_STATE_LOG_MIN_ISR: 1
+      KAFKA_GROUP_INITIAL_REBALANCE_DELAY_MS: 0
+      KAFKA_LOG_DIRS: /var/lib/kafka/data
     volumes:
-      kafka_data:/tmp/kraft-combined-logs
+      - kafka_data:/var/lib/kafka/data
     networks:
       - data-pipeline
-    healcheck:
+    healthcheck:
       test: ["CMD", "kafka-broker-api-versions", "--bootstrap-server", "localhost:9092"]
       interval: 10s
       timeout: 5s
       retries: 5
   # Kafka UI
   kafka-ui:
-    image: provectuslabs/kafka-ui:lastest
-    container_name:kafka_ui
+    image: provectuslabs/kafka-ui:latest
+    container_name: kafka_ui
     ports:
-      - "8080:8080"
+      - "127.0.0.1:8080:8080"
     environment:
       KAFKA_CLUSTERS_0_NAME: local
-      KAFKA_CLUSTER_0_BOOTSTRAPSERVERS: kafka:9092
+      KAFKA_CLUSTERS_0_BOOTSTRAPSERVERS: kafka:9092
     depends_on:
-      kafka
+      - kafka
     networks:
       - data-pipeline
 
@@ -69,8 +76,13 @@ services:
   redis:
     image: redis:7-alpine
     container_name: redis_cache
+    environment:
+      POSTGRES_HOST: postgres
+      POSTGRES_USER: ${POSTGRES_USER}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
+      POSTGRES_DB: ${POSTGRES_DB}
     ports:
-      - "6379:6379"
+      - "127.0.0.1:6379:6379"
     volumes:
       - redis_data:/data
     networks:
@@ -81,27 +93,51 @@ services:
       timeout: 5s
       retries: 5
 
-    # Producer Service
-    producer:
-      build:
+  # Producer Service
+  producer:
+    build:
       context: ./producer
       dockerfile: Dockerfile
-      container_name:data_producer
-      environment:
-        KAFKA_BOOTSTRAP_SERVERS: kafka:9092
-        POSTGRES_HOST: postgres
-        POSTGRES_USER: ${POSTGRES_USER}
-        POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
-        POSTGRES_DB: ${POSTGRES_DB}
-      depends_on:
-        kafka:
-          condition: service_healthy
-        postgres:
-          condition: service_healthy
-        networkds:
-          - data-pipeline
-        restart: unless-stopped
+    container_name: data_producer
+    environment:
+      KAFKA_BOOTSTRAP_SERVERS: kafka:9092
+      POSTGRES_HOST: postgres
+      POSTGRES_USER: ${POSTGRES_USER}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
+      POSTGRES_DB: ${POSTGRES_DB}
+    depends_on:
+      kafka:
+        condition: service_healthy
+      postgres:
+        condition: service_healthy
+    networks:
+      - data-pipeline
+    restart: unless-stopped
+  # Consumer Service
+  consumer:
+    build:
+      context: ./consumer
+      dockerfile: Dockerfile
+    container_name: data_consumer
+    environment:
+      KAFKA_BOOTSTRAP_SERVERS: kafka:9092
+      POSTGRES_HOST: postgres
+      POSTGRES_USER: ${POSTGRES_USER}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
+      POSTGRES_DB: ${POSTGRES_DB}
+      REDIS_HOST: redis
+    depends_on:
+      kafka:
+        condition: service_healthy
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    networks:
+      - data-pipeline
+    restart: unless-stopped
   # Stream Processor
+  stream-processor:
     build:
       context: ./stream-processor
       dockerfile: Dockerfile
@@ -128,12 +164,14 @@ services:
       dockerfile: Dockerfile
     container_name: analytics_api
     ports:
-      - "5000:5000"
+      - "127.0.0.1:5000:5000"
     environment:
       POSTGRES_HOST: postgres
       POSTGRES_USER: ${POSTGRES_USER}
       POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
       POSTGRES_DB: ${POSTGRES_DB}
+      REDIS_HOST: redis
+      REDIS_PORT: 6379
     depends_on:
       postgres:
         condition: service_healthy
