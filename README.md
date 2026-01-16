@@ -35,7 +35,7 @@ Producer → Kafka → Consumer ────────┬───────
 
 ```bash
 # Clone project
-git clone <your-repo>
+git clone https://github.com/nullbytexe/ecommerce-data-pipeline
 cd ecommerce-data-pipeline
 
 # Khởi động tất cả services
