@@ -31,7 +31,7 @@ class DataConsumer:
                     Config.ORDER_ITEMS_TOPIC,
                     Config.CUSTOMERS_TOPIC,
                     Config.PRODUCTS_TOPIC,
-                    bootstrap_servers = Config.KAFKA_BOOSTRAP_SERVERS,
+                    bootstrap_servers = Config.KAFKA_BOOTSTRAP_SERVERS,
                     group_id = Config.GROUP_ID,
                     auto_offset_reset = Config.AUTO_OFFSET_RESET,
                     enable_auto_commit = True, #commit offset định kỳ, trước khi xử lý dữ liệu -> mất data, nếu crash (xài trong demo do postgre auto commit = false nên vẫn đảm bảo tính toàn vẹn)
