@@ -1,7 +1,7 @@
 import os
 
 class Config:
-    KAFKA_BOOSTRAP_SERVERS = os.getenv('KAFKA_BOOTSTRAP_SERVERS','localhost:9092')
+    KAFKA_BOOTSTRAP_SERVERS = os.getenv('KAFKA_BOOTSTRAP_SERVERS','localhost:9092')
     POSTGRES_HOST = os.getenv('POSTGRES_HOST', 'localhost')
     POSTGRES_USER = os.getenv('POSTGRES_USER', 'dataeng')
     POSTGRES_PASSWORD = os.getenv('POSTGRES_PASSWORD', 'dataeng123')
