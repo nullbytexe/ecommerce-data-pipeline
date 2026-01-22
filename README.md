@@ -51,7 +51,7 @@ docker-compose ps
 ### Truy cập Services
 - **Kafka UI:** http://localhost:8080
 - **API:** http://localhost:5000
-- **PostgreSQL:** localhost:5432
+- **PostgreSQL:** localhost:5433
 - **Redis:** localhost:6379
 
 ## 📊 API Endpoints
