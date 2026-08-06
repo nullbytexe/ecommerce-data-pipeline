@@ -172,7 +172,7 @@ def customer_segments():
     except Exception as e:
         return jsonify({'error': str(e)}), 500
 
-@app.route('/api/order/recent')
+@app.route('/api/orders/recent')
 def recent_orders():
     """Get recent orders"""
     try:
