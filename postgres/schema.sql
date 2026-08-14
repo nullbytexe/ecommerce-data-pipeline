@@ -81,13 +81,6 @@ CREATE TABLE IF NOT EXISTS analytics.hourly_metrics (
     top_category VARCHAR(100)
 );
 
-CREATE TABLE IF NOT EXISTS analytics.real_time_dashboard (
-    id SERIAL PRIMARY KEY,
-    metric_name VARCHAR(100),
-    metric_value DECIMAL(12,2),
-    timestamp TIMESTAMP DEFAULT NOW()
-);
-
 -- Create views
 CREATE OR REPLACE VIEW analytics.sales_overview AS 
 SELECT
