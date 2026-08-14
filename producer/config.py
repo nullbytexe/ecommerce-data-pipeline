@@ -14,5 +14,4 @@ class Config:
     PRODUCTS_TOPIC = 'products'
 
     # Producer settings
-    BATCH_SIZE = 10
     SLEEP_INTERVAL = 2
