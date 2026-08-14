@@ -38,7 +38,9 @@ def home():
             '/api/products/top': 'Get top products',
             '/api/customers/segments': "Get customer segments",
             '/api/orders/recent': 'Get recent orders',
-            '/api/metrics/realtime': 'Get real-time metrics'
+            '/api/metrics/realtime': 'Get real-time metrics',
+            '/api/customers/<customer_id>': 'Get a single customer (cached)',
+            '/api/products/<product_id>': 'Get a single product (cached)'
         }
     })
 
@@ -94,6 +96,72 @@ def dashboard():
         # Cache for 30 seconds
         redis_client.setex('dashboard_metrics', 30, json.dumps(result))
 
+        return jsonify(result)
+    except Exception as e:
+        return jsonify({'error': str(e)}), 500
+
+@app.route('/api/customers/<customer_id>')
+def get_customer(customer_id):
+    """Get a single customer — cache-aside, dùng đúng key mà Consumer đã ghi"""
+    try:
+        cache_key = f"customer:{customer_id}"
+        cached = redis_client.get(cache_key)
+        if cached:
+            return jsonify(json.loads(cached))
+
+        conn = get_db_connection()
+        cursor = conn.cursor()
+        cursor.execute(
+            "SELECT * FROM raw.customers WHERE customer_id = %s",
+            (customer_id,)
+        )
+        result = cursor.fetchone()
+        cursor.close()
+        conn.close()
+
+        if not result:
+            return jsonify({'error': 'Customer not found'}), 404
+
+        # json.dumps() không tự serialize datetime, nên convert trước khi cache
+        result = {
+            k: (v.isoformat() if isinstance(v, datetime) else v)
+            for k, v in result.items()
+        }
+
+        redis_client.setex(cache_key, 3600, json.dumps(result))
+        return jsonify(result)
+    except Exception as e:
+        return jsonify({'error': str(e)}), 500
+
+
+@app.route('/api/products/<product_id>')
+def get_product(product_id):
+    """Get a single product — cache-aside, dùng đúng key mà Consumer đã ghi"""
+    try:
+        cache_key = f"product:{product_id}"
+        cached = redis_client.get(cache_key)
+        if cached:
+            return jsonify(json.loads(cached))
+
+        conn = get_db_connection()
+        cursor = conn.cursor()
+        cursor.execute(
+            "SELECT * FROM raw.products WHERE product_id = %s",
+            (product_id,)
+        )
+        result = cursor.fetchone()
+        cursor.close()
+        conn.close()
+
+        if not result:
+            return jsonify({'error': 'Product not found'}), 404
+
+        result = {
+            k: (v.isoformat() if isinstance(v, datetime) else v)
+            for k, v in result.items()
+        }
+
+        redis_client.setex(cache_key, 3600, json.dumps(result))
         return jsonify(result)
     except Exception as e:
         return jsonify({'error': str(e)}), 500
