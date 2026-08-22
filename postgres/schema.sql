@@ -82,18 +82,34 @@ CREATE TABLE IF NOT EXISTS analytics.hourly_metrics (
 );
 
 -- Create views
-CREATE OR REPLACE VIEW analytics.sales_overview AS 
+CREATE OR REPLACE VIEW analytics.sales_overview AS
+WITH order_totals AS (
+    SELECT
+        DATE(order_date) AS sale_date,
+        order_id,
+        customer_id,
+        total_amount
+    FROM raw.orders
+),
+item_totals AS (
+    SELECT
+        order_id,
+        SUM(quantity * unit_price - COALESCE(discount, 0)) AS item_revenue,
+        SUM(quantity) AS item_qty
+    FROM raw.order_items
+    GROUP BY order_id
+)
 SELECT
-    DATE(o.order_date) as sale_date,
-    COUNT(DISTINCT o.order_id) as total_orders,
-    COUNT(DISTINCT o.customer_id) as unique_customers,
-    SUM(oi.quantity * oi.unit_price - COALESCE(oi.discount, 0)) as total_revenue,
-    AVG(o.total_amount) as avg_order_value, --về bản chất thì không đúng nhưng kết quả thì chính xác
-    SUM(oi.quantity) as total_items_sold
-FROM raw.orders o
-LEFT JOIN raw.order_items oi ON o.order_id = oi.order_id
-GROUP BY DATE(o.order_date)
-ORDER BY sale_date DESC;
+    ot.sale_date,
+    COUNT(DISTINCT ot.order_id) AS total_orders,
+    COUNT(DISTINCT ot.customer_id) AS unique_customers,
+    SUM(it.item_revenue) AS total_revenue,
+    AVG(ot.total_amount) AS avg_order_value,   
+    SUM(it.item_qty) AS total_items_sold
+FROM order_totals ot
+LEFT JOIN item_totals it ON ot.order_id = it.order_id
+GROUP BY ot.sale_date
+ORDER BY ot.sale_date DESC;
 
 CREATE OR REPLACE VIEW analytics.top_products AS
 SELECT
